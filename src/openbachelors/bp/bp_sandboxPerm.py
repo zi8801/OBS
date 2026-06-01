@@ -1,15 +1,25 @@
 from enum import Enum
 import random
 from functools import cmp_to_key
+from copy import deepcopy
+import logging
 
 from fastapi import APIRouter
 from fastapi import Request
 
 from ..const.json_const import true, false, null
-from ..const.filepath import CONFIG_JSON, VERSION_JSON, SANDBOX_PERM_TABLE
+from ..const.filepath import (
+    CONFIG_JSON,
+    VERSION_JSON,
+    SANDBOX_PERM_TABLE,
+    UNIEQUIP_TABLE,
+)
 from ..util.const_json_loader import const_json_loader, ConstJson
 from ..util.player_data import player_data_decorator
 from ..util.battle_log_logger import log_battle_log_if_necessary
+from ..util.helper import get_char_num_id
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -750,5 +760,755 @@ async def sandboxPerm_sandboxV2_exitChallenge(player_data, request: Request):
     sandbox_manager = get_sandbox_manager(player_data, topic_id, request_json, response)
 
     sandbox_manager.sandboxPerm_sandboxV2_exitChallenge()
+
+    return response
+
+
+@router.post("/sandboxPerm/pinTopic")
+@player_data_decorator
+async def sandboxPerm_pinTopic(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    player_data["sandboxPerm"]["pin"] = request_json["topicId"]
+
+    return response
+
+
+@router.post("/sandboxPerm/changeTopic")
+@player_data_decorator
+async def sandboxPerm_changeTopic(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    player_data["sandboxPerm"]["topic"] = request_json["topicId"]
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/homeEnter")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_homeEnter(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/switchMode")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_switchMode(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["game"]["modeId"] = (
+        request_json["modeId"]
+    )
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/changeDefend")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_changeDefend(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    zone_id = request_json["zoneId"]
+    char_id_lst = request_json["chars"]
+    flag = request_json["operate"]
+
+    for cur_zone_id, zone_obj in player_data["sandboxPerm"]["template"]["SANDBOX_V3"][
+        topic_id
+    ]["map"]["zone"]:
+        if zone_obj["defend"]["main"] in char_id_lst:
+            zone_obj["defend"]["main"] = -1
+
+        cur_sub_lst = zone_obj["defend"]["sub"].copy()
+
+        for char_id in char_id_lst:
+            try:
+                cur_sub_lst.remove(char_id)
+            except ValueError:
+                pass
+
+        zone_obj["defend"]["sub"] = cur_sub_lst
+
+    if flag == 0:
+        if len(char_id_lst) > 0:
+            char_id = char_id_lst[0]
+        else:
+            char_id = -1
+        player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["map"]["zone"][
+            zone_id
+        ]["defend"]["main"] = char_id
+
+    elif flag == 1:
+        player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["map"]["zone"][
+            zone_id
+        ]["defend"]["sub"] = char_id_lst
+
+    return response
+
+
+def add_item_in_topic(player_data, topic_id: str, item_id: str, count: int):
+    trap_obj = player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id][
+        "inventory"
+    ]["trap"]
+
+    if item_id in trap_obj:
+        num_item = trap_obj[item_id]
+    else:
+        num_item = 0
+
+    num_item += count
+
+    trap_obj[item_id] = num_item
+
+
+@router.post("/sandboxPerm/sandboxV3/homeShopBuy")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_homeShopBuy(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+    good_id = request_json["goodId"]
+    count = request_json["count"]
+
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+    item_id = sandbox_perm_table["detail"]["SANDBOX_V3"][topic_id]["baseShopGoodData"][
+        good_id
+    ]["itemId"]
+
+    add_item_in_topic(player_data, topic_id, item_id, count)
+
+    response["items"] = [
+        {
+            "id": item_id,
+            "count": count,
+        }
+    ]
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/homeShopSell")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_homeShopSell(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+    item_id = request_json["itemId"]
+    count = request_json["count"]
+
+    add_item_in_topic(player_data, topic_id, item_id, -count)
+
+    response["items"] = [
+        {
+            "id": "sandbox_2_basegold",
+            "count": 0,
+        },
+        {
+            "id": "sandbox_2_basegoldEx",
+            "count": 0,
+        },
+    ]
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/homeSave")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_homeSave(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+
+    building_obj = player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id][
+        "base"
+    ]["building"]
+
+    for op in request_json["operation"]:
+        op_type = op["type"]
+        item_id = op["itemId"]
+
+        pos = op["pos"]
+        dir = op.get("dir", 3)
+
+        if item_id not in building_obj:
+            building_obj[item_id] = []
+
+        match op_type:
+            # add
+            case 1:
+                building_item_lst = building_obj[item_id].copy()
+
+                building_item_lst.append(
+                    {
+                        "pos": pos,
+                        "dir": dir,
+                    }
+                )
+
+                building_obj[item_id] = building_item_lst
+
+                add_item_in_topic(player_data, topic_id, item_id, -1)
+            # remove
+            case 3:
+                building_item_lst = building_obj[item_id].copy()
+
+                for building_item_idx, building_item in enumerate(building_item_lst):
+                    if building_item["pos"] == pos:
+                        building_item_lst.pop(building_item_idx)
+                        break
+
+                building_obj[item_id] = building_item_lst
+
+                add_item_in_topic(player_data, topic_id, item_id, 1)
+            # upgrade
+            case 2:
+                new_item_id = sandbox_perm_table["detail"]["SANDBOX_V3"][topic_id][
+                    "baseTrapUpgradeData"
+                ][item_id]["upgradeItemId"]
+
+                if new_item_id not in building_obj:
+                    building_obj[new_item_id] = []
+
+                # remove old
+
+                building_item_lst = building_obj[item_id].copy()
+
+                for building_item_idx, building_item in enumerate(building_item_lst):
+                    if building_item["pos"] == pos:
+                        building_item_lst.pop(building_item_idx)
+                        break
+
+                building_obj[item_id] = building_item_lst
+
+                # add new
+
+                new_building_item_lst = building_obj[new_item_id].copy()
+
+                new_building_item_lst.append(building_item)
+
+                building_obj[new_item_id] = new_building_item_lst
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["base"]["animal"] = (
+        request_json["catchedAnimals"]
+    )
+
+    return response
+
+
+def get_stage_id(topic_id: str, node_id: str) -> str:
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+
+    return sandbox_perm_table["detail"]["SANDBOX_V3"][topic_id]["mainMapData"]["nodes"][
+        node_id
+    ]["stageId"]
+
+
+def try_get_story_map_obj(topic_id: str, node_id: str) -> dict | None:
+    stage_id = get_stage_id(topic_id, node_id)
+
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+    story_stage_data = sandbox_perm_table["detail"]["SANDBOX_V3"][topic_id][
+        "storyStageData"
+    ]
+
+    if stage_id not in story_stage_data:
+        return None
+
+    story_stage_obj = story_stage_data[stage_id]
+
+    story_map_obj = {
+        "subStage": story_stage_obj["subStageIdList"].copy(),
+        "initIndex": story_stage_obj["initialSubStageIndexList"].copy(),
+        "unlockIndex": story_stage_obj["initialSubStageIndexList"].copy(),
+    }
+
+    return story_map_obj
+
+
+def get_random_map_obj(topic_id: str) -> dict:
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+
+    sub_stage_data = sandbox_perm_table["detail"]["SANDBOX_V3"][topic_id][
+        "subStageData"
+    ]
+
+    sub_stage_id_lst = []
+
+    for sub_stage_id, sub_stage_obj in sub_stage_data:
+        if len(sub_stage_id) != 5:
+            continue
+
+        sub_stage_id_lst.append(sub_stage_id)
+
+    num_map_sub_stage = 9
+    map_sub_stage_id_lst = random.sample(sub_stage_id_lst, num_map_sub_stage)
+    map_init_index = random.randint(0, num_map_sub_stage - 1)
+
+    return {
+        "subStage": map_sub_stage_id_lst,
+        "initIndex": [map_init_index],
+        "unlockIndex": [map_init_index],
+    }
+
+
+def try_get_shop_id(topic_id: str, node_id: str, shop_type: str) -> str | None:
+    stage_id = get_stage_id(topic_id, node_id)
+
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+
+    stage_shop_list_data = sandbox_perm_table["detail"]["SANDBOX_V3"][topic_id][
+        "stageShopListData"
+    ]
+
+    if stage_id not in stage_shop_list_data:
+        return None
+
+    stage_shop_obj = stage_shop_list_data[stage_id]
+    for shop_idx, shop_obj in stage_shop_obj:
+        if shop_obj["shopType"] == shop_type:
+            return shop_obj["shopId"]
+
+    return None
+
+
+@router.post("/sandboxPerm/sandboxV3/createGame")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_createGame(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    node_id = request_json["nodeId"]
+    difficulty_id = request_json["difficultyId"]
+    if not difficulty_id:
+        difficulty_id = ""
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"] = {
+        "nodeId": node_id,
+        "state": 0,
+        "game": {
+            "idx": 1,
+            "openTs": 1700000000,
+            "difficultyId": difficulty_id,
+            "npcInstId": -1,
+            "day": 1,
+            "weather": "weather_normal",
+            "windDir": 0,
+            "power": 0,
+            "pros": 0,
+            "aesth": 0,
+            "success": false,
+        },
+        "band": {"id": "", "level": 0},
+        "map": {"subStage": [], "initIndex": [], "unlockIndex": []},
+        "troop": {
+            "slots": [],
+            "chars": {},
+            "food": {},
+            "maxRecruit": 12,
+            "canRecruit": 6,
+            "currentRecruit": [],
+            "removeChar": [],
+            "defend": {"mainIds": [], "otherIds": []},
+            "refreshPrice": 0,
+        },
+        "bag": {
+            "recipe": [
+                "sandbox_2_recipe_infrastructure_1",
+                "sandbox_2_recipe_infrastructure_2",
+                "sandbox_2_recipe_infrastructure_3",
+                "sandbox_2_recipe_infrastructure_4",
+                "sandbox_2_recipe_infrastructure_5",
+                "sandbox_2_recipe_infrastructure_6",
+                "sandbox_2_recipe_infrastructure_8",
+                "sandbox_2_recipe_infrastructure_9",
+                "sandbox_2_recipe_infrastructure_10",
+                "sandbox_2_recipe_infrastructure_12",
+                "sandbox_2_recipe_process_1",
+                "sandbox_2_recipe_producer_7",
+                "sandbox_2_recipe_tactical_1",
+                "sandbox_2_recipe_tactical_2",
+                "sandbox_2_recipe_tactical_6",
+                "sandbox_2_recipe_tactical_7",
+                "sandbox_2_recipe_tactical_11",
+            ],
+            "material": {
+                "sandbox_2_beef": 3,
+                "sandbox_2_crab": 3,
+                "sandbox_2_poultry": 3,
+                "sandbox_2_supermeat": 3,
+                "sandbox_2_venison": 3,
+                "sandbox_2_water": 3,
+                "sandbox_2_wheat": 3,
+            },
+            "coin": {
+                "sandbox_2_gold": 999999,
+                "sandbox_2_dimensioncoin": 999999,
+            },
+            "relic": [],
+        },
+        "shop": {
+            "shopId": "",
+            "slots": [],
+            "recruit": {"show": false, "price": 0},
+            "refreshPrice": 0,
+            "sellPrice": {},
+            "showBattleShop": true,
+        },
+        "save": null,
+        "dailyReport": null,
+        "event": null,
+        "effect": {
+            "rune": [
+                "sandbox_v3_talent_1",
+                "sandbox_v3_talent_2_lv1",
+                "sandbox_v3_talent_2_lv2",
+                "sandbox_v3_talent_3_lv1",
+                "sandbox_v3_talent_3_lv2",
+                "sandbox_v3_talent_4_lv1",
+                "sandbox_v3_talent_4_lv2",
+                "sandbox_v3_talent_5_lv1",
+                "sandbox_v3_talent_5_lv2",
+                "sandbox_v3_talent_6_lv1",
+                "sandbox_v3_talent_6_lv2",
+                "sandbox_v3_talent_7_lv1",
+                "sandbox_v3_talent_7_lv2",
+                "sandbox_v3_talent_8",
+                "sandbox_v3_weather_heat[ex]",
+                "sandbox_v3_weather_lightning[ex]",
+                "sandbox_v3_weather_rain[ex]",
+                "sandbox_v3_weather_storm[ex]",
+            ],
+            "shopRefreshDiscount": 20,
+            "shopRefreshFree": 1,
+            "shopSlotAdd": 2,
+            "shopStockAdd": {
+                "sandbox_2_good_beef_6": 9,
+                "sandbox_2_good_brick_5": 5,
+                "sandbox_2_good_crab_9": 9,
+                "sandbox_2_good_diamond_5": 5,
+                "sandbox_2_good_iron_10": 10,
+                "sandbox_2_good_plank_5": 5,
+                "sandbox_2_good_poultry_6": 9,
+                "sandbox_2_good_steel_5": 5,
+                "sandbox_2_good_stone_10": 10,
+                "sandbox_2_good_supermeat_3": 2,
+                "sandbox_2_good_venison_9": 9,
+                "sandbox_2_good_wheat_10": 9,
+                "sandbox_2_good_wheat_9": 9,
+                "sandbox_2_good_wood_10": 10,
+            },
+            "shopDiscountRate": 30,
+            "gapGainItem": {},
+            "recipeRefreshDiscount": 0,
+            "productAdd": {},
+            "trapDrop": {},
+            "buildReturn": {},
+            "taskRefreshAdd": 3,
+            "initGainItem": {
+                "sandbox_2_beef": 3,
+                "sandbox_2_crab": 3,
+                "sandbox_2_gold": 60,
+                "sandbox_2_poultry": 3,
+                "sandbox_2_recipe_infrastructure_12": 1,
+                "sandbox_2_recipe_infrastructure_4": 1,
+                "sandbox_2_recipe_infrastructure_5": 1,
+                "sandbox_2_recipe_tactical_1": 1,
+                "sandbox_2_recipe_tactical_2": 1,
+                "sandbox_2_recipe_tactical_6": 1,
+                "sandbox_2_recipe_tactical_7": 1,
+                "sandbox_2_supermeat": 3,
+                "sandbox_2_venison": 3,
+                "sandbox_2_water": 3,
+                "sandbox_2_wheat": 3,
+            },
+            "rookieCharIds": [],
+            "sellPrice": {},
+        },
+    }
+
+    map_obj = try_get_story_map_obj(topic_id, node_id)
+    if not map_obj:
+        map_obj = get_random_map_obj(topic_id)
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["map"] = (
+        map_obj
+    )
+
+    rest_shop_id = try_get_shop_id(topic_id, node_id, "REST")
+    if rest_shop_id:
+        player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+            "shop"
+        ]["shopId"] = rest_shop_id
+
+    player_data["sandboxPerm"]["summary"]["SANDBOX_V3"][topic_id]["inCurrent"] = True
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/giveUpGame")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_giveUpGame(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"] = None
+
+    player_data["sandboxPerm"]["summary"]["SANDBOX_V3"][topic_id]["inCurrent"] = False
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/chooseBand")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_chooseBand(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    band_id = request_json["bandId"]
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["band"][
+        "id"
+    ] = band_id
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["band"][
+        "level"
+    ] = 3
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+        "state"
+    ] = 1
+
+    return response
+
+
+def recruit_char(player_data, topic_id: str, recruit_lst: list):
+    slot_lst = player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id][
+        "current"
+    ]["troop"]["slots"].copy()
+    cur_recruit_lst = player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id][
+        "current"
+    ]["troop"]["currentRecruit"].copy()
+
+    for recruit_obj in recruit_lst:
+        new_inst_id = len(slot_lst) + 1
+        slot_obj = deepcopy(recruit_obj)
+        slot_obj["charInstId"] = new_inst_id
+        slot_lst.append(slot_obj)
+
+        char_obj = player_data["troop"]["chars"][str(recruit_obj["charInstId"])].copy()
+        char_obj["instId"] = new_inst_id
+        player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+            "troop"
+        ]["chars"][str(new_inst_id)] = char_obj
+
+        cur_recruit_lst.append(new_inst_id)
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["troop"][
+        "slots"
+    ] = slot_lst
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["troop"][
+        "currentRecruit"
+    ] = cur_recruit_lst
+
+
+@router.post("/sandboxPerm/sandboxV3/initRecruit")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_initRecruit(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    recruit_lst = request_json["ownChars"]
+
+    assist_obj = request_json["assistFriend"]
+    if assist_obj:
+        assist_char = assist_obj["assistChar"]
+        recruit_lst.append(
+            {
+                "charInstId": get_char_num_id(assist_char["charId"]),
+                "skillIndex": assist_char["skillIndex"],
+                "currentEquip": assist_char["currentEquip"],
+            }
+        )
+
+    recruit_char(player_data, topic_id, recruit_lst)
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/battleStart")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_battleStart(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["troop"][
+        "currentRecruit"
+    ] = []
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+        "state"
+    ] = 2
+
+    node_id = player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+        "nodeId"
+    ]
+
+    battle_shop_id = try_get_shop_id(topic_id, node_id, "BATTLE")
+    if not battle_shop_id:
+        battle_shop_id = ""
+
+    response.update(
+        {
+            "battleId": "00000000-0000-0000-0000-000000000000",
+            "battleShopId": battle_shop_id,
+        }
+    )
+
+    return response
+
+
+def get_item_type(item_id: str) -> str:
+    sandbox_perm_table = const_json_loader[SANDBOX_PERM_TABLE]
+
+    return sandbox_perm_table["itemData"][item_id]["itemType"]
+
+
+@router.post("/sandboxPerm/sandboxV3/battleFinish")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_battleFinish(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    log_battle_log_if_necessary(player_data, request_json["data"])
+
+    topic_id = request_json["topicId"]
+
+    save_obj = request_json["sandboxV3Data"]["saveData"]
+
+    item_lst = save_obj.pop("itemSave", [])
+    save_obj.pop("relicItemOrder", [])
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+        "save"
+    ] = save_obj
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["game"][
+        "day"
+    ] = 2
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["game"][
+        "power"
+    ] = save_obj["powerValue"]
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["game"][
+        "pros"
+    ] = save_obj["prosperity"]
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["game"][
+        "aesth"
+    ] = save_obj["aesthetics"]
+
+    map_unlock_lst = [room["index"] for room in save_obj["roomSave"]]
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["map"][
+        "unlockIndex"
+    ] = map_unlock_lst
+
+    coin_dict = {}
+    material_dict = {}
+    relic_lst = []
+    recipe_lst = []
+    trap_dict = {}
+
+    for item_obj in item_lst:
+        item_id = item_obj["itemId"]
+        item_cnt = item_obj["cnt"]
+
+        item_type = get_item_type(item_id)
+
+        match item_type:
+            case "COIN":
+                coin_dict[item_id] = item_cnt
+            case "FOODMAT" | "SPECIALMAT" | "BUILDINGMAT" | "PRODUCT":
+                material_dict[item_id] = item_cnt
+            case "RELIC":
+                relic_lst.append(item_id)
+            case "RECIPE":
+                recipe_lst.append(item_id)
+            case "BUILDING" | "ANIMAL" | "TACTICAL":
+                trap_dict[item_id] = item_cnt
+            case _:
+                logger.warning(f"unknown item {item_id} of item_type {item_type}")
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"]["bag"] = {
+        "coin": coin_dict,
+        "material": material_dict,
+        "relic": relic_lst,
+        "recipe": recipe_lst,
+        "trap": trap_dict,
+    }
+
+    player_data["sandboxPerm"]["template"]["SANDBOX_V3"][topic_id]["current"][
+        "state"
+    ] = 5
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/getDailyRecruitList")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_getDailyRecruitList(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    uniequip_table = const_json_loader[UNIEQUIP_TABLE]
+
+    sub_prof_lst = []
+    for sub_prof_id, sub_prof_obj in uniequip_table["subProfDict"]:
+        sub_prof_lst.append(sub_prof_id)
+
+    response.update(
+        {
+            "subProfessionList": sub_prof_lst,
+            "tempCharList": [],
+            "rookieCharList": [],
+        }
+    )
+
+    return response
+
+
+@router.post("/sandboxPerm/sandboxV3/dailyRecruit")
+@player_data_decorator
+async def sandboxPerm_sandboxV3_dailyRecruit(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    topic_id = request_json["topicId"]
+
+    recruit_lst = [request_json["ownChar"]]
+
+    recruit_char(player_data, topic_id, recruit_lst)
 
     return response
