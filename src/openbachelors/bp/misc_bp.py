@@ -947,3 +947,68 @@ async def cg_removeCgCollection(player_data, request: Request):
 
     response = {"cgList": cg_lst}
     return response
+
+
+@router.post("/activity/act24side/setTool")
+@player_data_decorator
+async def activity_act24side_setTool(player_data, request: Request):
+    request_json = await request.json()
+
+    activity_id = request_json["activityId"]
+
+    tool_obj = player_data["activity"]["TYPE_ACT24SIDE"][activity_id]["tool"]
+    for tool_id, tool_flag in tool_obj:
+        tool_obj[tool_id] = 1
+
+    for tool_id in request_json["tools"]:
+        tool_obj[tool_id] = 2
+
+    response = {}
+    return response
+
+
+@router.post("/activity/act24side/battleStart")
+@player_data_decorator
+async def activity_act24side_battleStart(player_data, request: Request):
+    request_json = await request.json()
+
+    response = {
+        "result": 0,
+        "battleId": "00000000-0000-0000-0000-000000000000",
+        "apFailReturn": 0,
+        "isApProtect": 0,
+        "inApProtectPeriod": false,
+        "notifyPowerScoreNotEnoughIfFailed": false,
+    }
+    return response
+
+
+@router.post("/activity/act24side/battleFinish")
+@player_data_decorator
+async def activity_act24side_battleFinish(player_data, request: Request):
+    request_json = await request.json()
+
+    log_battle_log_if_necessary(player_data, request_json["data"])
+
+    response = {
+        "result": 0,
+        "apFailReturn": 0,
+        "expScale": 1.2,
+        "goldScale": 1.2,
+        "rewards": [],
+        "firstRewards": [],
+        "unlockStages": [],
+        "unusualRewards": [],
+        "additionalRewards": [],
+        "furnitureRewards": [],
+        "overrideRewards": [],
+        "alert": [],
+        "suggestFriend": false,
+        "pryResult": [],
+        "itemReturn": [],
+        "extra": {},
+        "firstMeldingRewards": [],
+        "meldingRewards": [],
+        "mealMeldingRewards": [],
+    }
+    return response
