@@ -550,7 +550,10 @@ async def templateTrap_setTrapSquad(player_data, request: Request):
         request_json["trapSquad"]
     )
 
-    response = {}
+    response = {
+        "trapDomainId": request_json.get("trapDomainId"),
+        "trapSquad": request_json.get("trapSquad"),
+    }
     return response
 
 
@@ -972,6 +975,9 @@ async def activity_act24side_setTool(player_data, request: Request):
 async def activity_act24side_battleStart(player_data, request: Request):
     request_json = await request.json()
 
+    stage_id = request_json["stageId"]
+    player_data.extra_save.save_obj["cur_stage_id"] = stage_id
+
     response = {
         "result": 0,
         "battleId": "00000000-0000-0000-0000-000000000000",
@@ -1010,5 +1016,51 @@ async def activity_act24side_battleFinish(player_data, request: Request):
         "firstMeldingRewards": [],
         "meldingRewards": [],
         "mealMeldingRewards": [],
+    }
+    return response
+
+
+@router.post("/activity/football/battleStart")
+@player_data_decorator
+async def activity_football_battleStart(player_data, request: Request):
+    request_json = await request.json()
+
+    response = {
+        "result": 0,
+        "battleId": "00000000-0000-0000-0000-000000000000",
+        "apFailReturn": 0,
+        "isApProtect": 0,
+        "inApProtectPeriod": false,
+        "notifyPowerScoreNotEnoughIfFailed": false,
+    }
+    return response
+
+
+@router.post("/activity/football/battleFinish")
+@player_data_decorator
+async def activity_football_battleFinish(player_data, request: Request):
+    request_json = await request.json()
+
+    log_battle_log_if_necessary(player_data, request_json["data"])
+
+    response = {
+        "result": 0,
+        "apFailReturn": 0,
+        "expScale": 0,
+        "goldScale": 0,
+        "rewards": [],
+        "firstRewards": [],
+        "unlockStages": [],
+        "unusualRewards": [],
+        "additionalRewards": [],
+        "furnitureRewards": [],
+        "alert": [],
+        "suggestFriend": false,
+        "pryResult": [],
+        "enemyScore": 0,
+        "selfScore": 99,
+        "isNewRecord": false,
+        "milestoneBefore": 0,
+        "milestoneAdd": 0,
     }
     return response
