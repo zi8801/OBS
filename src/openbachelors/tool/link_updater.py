@@ -1,5 +1,7 @@
 import requests
 import json
+from urllib.parse import urlparse
+from pathlib import Path
 
 from ..const.filepath import (
     GAME_LINK_FILEPATH,
@@ -7,7 +9,9 @@ from ..const.filepath import (
     MUMU_LINK_FILEPATH,
     MUMU_15_LINK_FILEPATH,
     LD_LINK_FILEPATH,
+    PC_GAME_EN_LINK_FILEPATH,
 )
+from ..util.helper import get_en_launcher_header
 
 REQUESTS_TIMEOUT = 60
 
@@ -98,6 +102,54 @@ def get_pc_game_link():
         return None
 
 
+def get_pc_game_en_link():
+    try:
+        obj = requests.get(
+            "https://api-launcher-en.yo-star.com/api/launcher/game/config",
+            headers=get_en_launcher_header(),
+            timeout=REQUESTS_TIMEOUT,
+        ).json()
+
+        version = obj["data"]["game_latest_version"]
+        file_path = obj["data"]["game_latest_file_path"]
+
+        obj = requests.get(
+            "https://api-launcher-en.yo-star.com/api/launcher/game/config/json",
+            params={
+                "version": version,
+                "file_path": file_path,
+            },
+            headers=get_en_launcher_header(),
+            timeout=REQUESTS_TIMEOUT,
+        ).json()
+
+        url = obj["data"]["url"]
+
+        obj = requests.get(
+            url,
+            timeout=REQUESTS_TIMEOUT,
+        ).json()
+
+        source = obj["source"]
+
+        link_lst = []
+
+        for i in obj["file"]:
+            link_lst.append(
+                f"https://launcher-pkg-ark-en.yo-star.com{source}{i['path']}"
+            )
+
+        result_lst = []
+
+        for link in link_lst:
+            dirpath = Path(urlparse(link).path.lstrip("/")).parent.as_posix()
+            result_lst.append(f"{link}\n  dir={dirpath}")
+
+        return "\n".join(result_lst)
+    except Exception:
+        return None
+
+
 def main():
     game_link = get_game_link()
 
@@ -128,6 +180,12 @@ def main():
     if ld_link is not None:
         with open(LD_LINK_FILEPATH, "w", encoding="utf-8") as f:
             f.write(ld_link)
+
+    pc_game_en_link = get_pc_game_en_link()
+
+    if pc_game_en_link is not None:
+        with open(PC_GAME_EN_LINK_FILEPATH, "w", encoding="utf-8") as f:
+            f.write(pc_game_en_link)
 
 
 if __name__ == "__main__":

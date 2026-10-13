@@ -107,17 +107,22 @@ truststore.inject_into_ssl()
 
 
 def main():
-    reload = True
 
     if is_app_frozen():
-        reload = False
-
-    uvicorn.run(
-        "openbachelors.app:app",
-        host="127.0.0.1",
-        port=8443,
-        reload=reload,
-    )
+        config = uvicorn.Config(
+            "openbachelors.app:app",
+            host="127.0.0.1",
+            port=8443,
+        )
+        server = uvicorn.Server(config)
+        asyncio.run(server.serve())
+    else:
+        uvicorn.run(
+            "openbachelors.app:app",
+            host="127.0.0.1",
+            port=8443,
+            reload=True,
+        )
 
 
 if __name__ == "__main__":

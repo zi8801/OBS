@@ -23,6 +23,7 @@ import aiofiles
 import httpx
 
 from ..const.filepath import TMP_DIRPATH
+from ..const.region import GAME_REGION, GameRegion
 
 
 def is_char_id(char_id: str) -> bool:
@@ -293,7 +294,7 @@ def get_random_key(key_probability_dict: dict):
     return None
 
 
-str_tag_dict = {
+str_tag_cn_dict = {
     "PIONEER": "先锋干员",
     "WARRIOR": "近卫干员",
     "TANK": "重装干员",
@@ -308,8 +309,33 @@ str_tag_dict = {
     "TIER_5": "资深干员",
 }
 
+str_tag_en_dict = {
+    "PIONEER": "Vanguard",
+    "WARRIOR": "Guard",
+    "TANK": "Defender",
+    "SNIPER": "Sniper",
+    "CASTER": "Caster",
+    "MEDIC": "Medic",
+    "SUPPORT": "Supporter",
+    "SPECIAL": "Specialist",
+    "MELEE": "Melee",
+    "RANGED": "Ranged",
+    "TIER_6": "Top Operator",
+    "TIER_5": "Senior Operator",
+}
+
+
+def get_str_tag_dict() -> dict:
+    match GAME_REGION:
+        case GameRegion.GAME_REGION_CN:
+            return str_tag_cn_dict
+        case GameRegion.GAME_REGION_EN:
+            return str_tag_en_dict
+
 
 def get_char_str_tag_lst(char_obj):
+    str_tag_dict = get_str_tag_dict()
+
     char_str_tag_lst = []
 
     char_str_tag_lst.append(str_tag_dict[char_obj["profession"]])
@@ -332,3 +358,23 @@ def get_httpx_client():
 
 def is_app_frozen():
     return getattr(sys, "frozen", False)
+
+
+def get_en_launcher_header():
+    t = int(time.time())
+
+    head = {"game_tag": "Arknights_EN", "time": t, "version": "1.8.1"}
+
+    head_str = json.dumps(head, separators=(",", ":"))
+    sign = md5(
+        f"{head_str}DE7108E9B2842FD460F4777702727869".encode("utf-8")
+    ).hexdigest()
+
+    return {
+        "Authorization": json.dumps(
+            {
+                "head": head,
+                "sign": sign,
+            }
+        )
+    }

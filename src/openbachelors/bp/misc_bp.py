@@ -1,4 +1,5 @@
 import random
+import json
 
 from fastapi import APIRouter
 from fastapi import Request
@@ -909,6 +910,23 @@ async def gallery_saveDiyMagazineV1(player_data, request: Request):
     return response
 
 
+@router.post("/gallery/saveDiyMagazineV2")
+@player_data_decorator
+async def gallery_saveDiyMagazineV2(player_data, request: Request):
+    request_form = await request.form()
+    request_json = json.loads(await request_form["json"].read())
+
+    magazine_obj = request_json["magazine"]
+
+    leaf_id = magazine_obj["leafId"]
+
+    player_data["gallery"]["leafMap"][leaf_id]["charSkin"] = magazine_obj["charSkin"]
+    player_data["gallery"]["leafMap"][leaf_id]["decorList"] = magazine_obj["decorList"]
+
+    response = {}
+    return response
+
+
 @router.post("/cg/getCgCollection")
 @player_data_decorator
 async def cg_getCgCollection(player_data, request: Request):
@@ -1062,5 +1080,128 @@ async def activity_football_battleFinish(player_data, request: Request):
         "isNewRecord": false,
         "milestoneBefore": 0,
         "milestoneAdd": 0,
+    }
+    return response
+
+
+@router.post("/troop/pinSpecialOperator")
+@player_data_decorator
+async def troop_pinSpecialOperator(player_data, request: Request):
+    request_json = await request.json()
+
+    char_num_id_str = request_json["instId"]
+    char_id = player_data["troop"]["chars"][char_num_id_str]["charId"]
+
+    player_data["mission"]["pinnedSpecialOperator"] = char_id
+
+    response = {}
+    return response
+
+
+@router.post("/arkodc/savePosition")
+@player_data_decorator
+async def arkodc_savePosition(player_data, request: Request):
+    request_json = await request.json()
+
+    topic_id = request_json["topicId"]
+
+    player_data["arkodc"]["topics"][topic_id]["position"] = {
+        "x": request_json["x"],
+        "y": request_json["y"],
+        "z": request_json["z"],
+    }
+
+    response = {}
+    return response
+
+
+@router.post("/arkodc/triggerInteraction")
+@player_data_decorator
+async def arkodc_triggerInteraction(player_data, request: Request):
+    request_json = await request.json()
+
+    response = {
+        "items": [],
+    }
+    return response
+
+
+@router.post("/arkodc/restart")
+@player_data_decorator
+async def arkodc_restart(player_data, request: Request):
+    request_json = await request.json()
+
+    response = {}
+    return response
+
+
+@router.post("/arkodc/battleStart")
+@player_data_decorator
+async def arkodc_battleStart(player_data, request: Request):
+    request_json = await request.json()
+
+    response = {
+        "result": 0,
+        "battleId": "00000000-0000-0000-0000-000000000000",
+        "apFailReturn": 0,
+        "isApProtect": 0,
+        "inApProtectPeriod": false,
+        "notifyPowerScoreNotEnoughIfFailed": false,
+    }
+    return response
+
+
+@router.post("/arkodc/battleFinish")
+@player_data_decorator
+async def arkodc_battleFinish(player_data, request: Request):
+    request_json = await request.json()
+
+    log_battle_log_if_necessary(player_data, request_json["data"])
+
+    response = {
+        "result": 0,
+        "apFailReturn": 0,
+        "expScale": 1.2,
+        "goldScale": 1.2,
+        "rewards": [],
+        "firstRewards": [],
+        "unlockStages": [],
+        "unusualRewards": [],
+        "additionalRewards": [],
+        "furnitureRewards": [],
+        "overrideRewards": [],
+        "alert": [],
+        "suggestFriend": false,
+        "pryResult": [],
+        "itemReturn": [],
+        "extra": {},
+    }
+    return response
+
+
+@router.post("/activity/act1dp/battleStart")
+@player_data_decorator
+async def activity_act1dp_battleStart(player_data, request: Request):
+    request_json = await request.json()
+
+    response = {
+        "result": 0,
+        "battleId": "00000000-0000-0000-0000-000000000000",
+    }
+    return response
+
+
+@router.post("/activity/act1dp/battleFinish")
+@player_data_decorator
+async def activity_act1dp_battleFinish(player_data, request: Request):
+    request_json = await request.json()
+
+    log_battle_log_if_necessary(player_data, request_json["data"])
+
+    response = {
+        "result": 0,
+        "rewardPt": 0,
+        "unlockStages": [],
+        "suggestFriend": false,
     }
     return response

@@ -326,7 +326,8 @@
             "char_4163_rosesa"
         ],
         "char_115_headbr": [
-            "char_115_headbr"
+            "char_115_headbr",
+            "char_1051_headb2"
         ],
         "char_102_texas": [
             "char_102_texas",
@@ -552,6 +553,9 @@
         "char_341_sntlla": [
             "char_341_sntlla"
         ],
+        "char_4031_liesel": [
+            "char_4031_liesel"
+        ],
         "char_388_mint": [
             "char_388_mint"
         ],
@@ -645,6 +649,12 @@
         ],
         "char_4139_papyrs": [
             "char_4139_papyrs"
+        ],
+        "char_4224_turdus": [
+            "char_4224_turdus"
+        ],
+        "char_4222_taraxa": [
+            "char_4222_taraxa"
         ],
         "char_148_nearl": [
             "char_148_nearl",
@@ -746,6 +756,9 @@
         "char_4043_erato": [
             "char_4043_erato"
         ],
+        "char_4221_ju": [
+            "char_4221_ju"
+        ],
         "char_4104_coldst": [
             "char_4104_coldst"
         ],
@@ -824,6 +837,9 @@
         ],
         "char_487_bobb": [
             "char_487_bobb"
+        ],
+        "char_4223_botany": [
+            "char_4223_botany"
         ],
         "char_215_mantic": [
             "char_215_mantic"
@@ -1067,6 +1083,9 @@
         "char_4123_ela": [
             "char_4123_ela"
         ],
+        "char_2027_wang": [
+            "char_2027_wang"
+        ],
         "char_147_shining": [
             "char_147_shining"
         ],
@@ -1131,6 +1150,9 @@
         "char_2024_chyue": [
             "char_2024_chyue"
         ],
+        "char_4037_demetr": [
+            "char_4037_demetr"
+        ],
         "char_172_svrash": [
             "char_172_svrash",
             "char_1045_svash2"
@@ -1159,7 +1181,8 @@
         ],
         "char_010_chen": [
             "char_010_chen",
-            "char_1013_chen2"
+            "char_1013_chen2",
+            "char_1050_chen3"
         ],
         "char_4009_irene": [
             "char_4009_irene"

@@ -11,12 +11,17 @@ pkg install -y postgresql
 
 export ANDROID_API_LEVEL=24
 
-pip install pipx
+pip install pipx==1.14.1
 pipx install poetry
+
 pipx ensurepath
+export PATH="${HOME}/.local/bin:${PATH}"
 
 poetry config installer.max-workers 1
 
-poetry install || true
+poetry install --only-root
+poetry self add poetry-plugin-export
+poetry export --without-hashes | xargs -d '\n' -n 1 poetry run pip install || true
+
 poetry run pip install psycopg[c]
 poetry install --only-root

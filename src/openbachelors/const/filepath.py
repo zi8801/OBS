@@ -1,7 +1,25 @@
+from .region import GAME_REGION, GameRegion
+
 CONFIG_JSON = "conf/config.json"
-VERSION_JSON = "conf/version.json"
-# VERSION_JSON = "conf/version_en.json"
-VERSION_WINDOWS_JSON = "conf/version_windows.json"
+VERSION_JSON_CN = "conf/version.json"
+VERSION_JSON_EN = "conf/version_en.json"
+
+match GAME_REGION:
+    case GameRegion.GAME_REGION_CN:
+        VERSION_JSON = VERSION_JSON_CN
+    case GameRegion.GAME_REGION_EN:
+        VERSION_JSON = VERSION_JSON_EN
+
+VERSION_WINDOWS_JSON_CN = "conf/version_windows.json"
+VERSION_WINDOWS_JSON_EN = "conf/version_en_windows.json"
+
+match GAME_REGION:
+    case GameRegion.GAME_REGION_CN:
+        VERSION_WINDOWS_JSON = VERSION_WINDOWS_JSON_CN
+    case GameRegion.GAME_REGION_EN:
+        VERSION_WINDOWS_JSON = VERSION_WINDOWS_JSON_EN
+
+
 ASSIST_JSON = "conf/assist.json"
 SQUAD_JSON = "conf/squad.json"
 
@@ -38,14 +56,23 @@ MOD_WINDOWS_DIRPATH = "mod_windows/"
 
 GAME_LINK_FILEPATH = "link/game.txt"
 PC_GAME_LINK_FILEPATH = "link/pc_game.txt"
+PC_GAME_EN_LINK_FILEPATH = "link/pc_game_en.txt"
 MUMU_LINK_FILEPATH = "link/mumu12.txt"
 MUMU_15_LINK_FILEPATH = "link/mumu15.txt"
 LD_LINK_FILEPATH = "link/ld14.txt"
 
 RES_LOCK_FILEPATH = "res_lock"
 
-RES_EXCEL_DIRPATH = "res/excel/"
-# RES_EXCEL_DIRPATH = "res_en/excel/"
+RES_EXCEL_DIRPATH_CN = "res/excel/"
+RES_EXCEL_DIRPATH_EN = "res_en/excel/"
+
+
+match GAME_REGION:
+    case GameRegion.GAME_REGION_CN:
+        RES_EXCEL_DIRPATH = RES_EXCEL_DIRPATH_CN
+    case GameRegion.GAME_REGION_EN:
+        RES_EXCEL_DIRPATH = RES_EXCEL_DIRPATH_EN
+
 
 SKIN_TABLE = RES_EXCEL_DIRPATH + "skin_table.json"
 CHARWORD_TABLE = RES_EXCEL_DIRPATH + "charword_table.json"
@@ -69,3 +96,4 @@ ROGUELIKE_TOPIC_TABLE = RES_EXCEL_DIRPATH + "roguelike_topic_table.json"
 GACHA_TABLE = RES_EXCEL_DIRPATH + "gacha_table.json"
 CRISIS_V2_TABLE = RES_EXCEL_DIRPATH + "crisis_v2_table.json"
 CAMPAIGN_TABLE = RES_EXCEL_DIRPATH + "campaign_table.json"
+CHAR_META_TABLE = RES_EXCEL_DIRPATH + "char_meta_table.json"

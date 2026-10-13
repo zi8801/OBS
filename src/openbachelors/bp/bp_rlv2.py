@@ -203,6 +203,7 @@ class Rlv2BasicManager:
         ELITE_BATTLE = 2
         BOSS_BATTLE = 4
         SHOP = 8
+        DUEL = 262144
 
     theme_id_node_type_dict = ConstJson(
         {
@@ -229,6 +230,7 @@ class Rlv2BasicManager:
                 NodeType.ELITE_BATTLE: 2,
                 NodeType.BOSS_BATTLE: 4,
                 NodeType.SHOP: 4096,
+                NodeType.DUEL: 262144,
             },
         }
     )
@@ -236,6 +238,9 @@ class Rlv2BasicManager:
     def get_node_type_int(self, theme_id, node_type):
         if theme_id not in self.theme_id_node_type_dict:
             theme_id = "rogue_4"
+
+        if node_type not in self.theme_id_node_type_dict[theme_id]:
+            return -1
 
         return self.theme_id_node_type_dict[theme_id][node_type]
 
@@ -341,6 +346,8 @@ class Rlv2BasicManager:
                 node_type = self.NodeType.ELITE_BATTLE
             if stage_obj["isBoss"]:
                 node_type = self.NodeType.BOSS_BATTLE
+            if "_duel_" in stage_id:
+                node_type = self.NodeType.DUEL
 
             node_type_int = self.get_node_type_int(self.theme_id, node_type)
 
@@ -432,13 +439,24 @@ class Rlv2BasicManager:
 
         return good_lst
 
-    def rlv2_moveTo(self):
-        cursor_pos = self.request_json["to"]
+    def get_current_node_type_int(self):
+        cursor_obj = self.player_data["rlv2"]["current"]["player"]["cursor"]
 
+        node_pos_x = cursor_obj["position"]["x"]
+        node_pos_y = cursor_obj["position"]["y"]
+
+        node_idx = self.get_node_idx(node_pos_x, node_pos_y)
+
+        zone_idx = cursor_obj["zone"]
+
+        return self.player_data["rlv2"]["current"]["map"]["zones"][str(zone_idx)][
+            "nodes"
+        ][node_idx]["type"]
+
+    def move_to_shop(self):
         good_lst = self.get_good_lst()
 
         self.player_data["rlv2"]["current"]["player"]["state"] = "PENDING"
-        self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] = cursor_pos
         self.player_data["rlv2"]["current"]["player"]["pending"] = [
             {
                 "index": "e_3",
@@ -456,6 +474,57 @@ class Rlv2BasicManager:
                         "goods": good_lst,
                         "_done": false,
                     }
+                },
+            }
+        ]
+
+    def get_theme_num_id(self):
+        return int(self.theme_id.rpartition("_")[-1])
+
+    def move_to_duel(self):
+        theme_num_id = self.get_theme_num_id()
+
+        self.player_data["rlv2"]["current"]["player"]["state"] = "PENDING"
+        self.player_data["rlv2"]["current"]["player"]["pending"] = [
+            {
+                "index": "e_7",
+                "type": "SCENE",
+                "content": {
+                    "scene": {
+                        "id": f"scene_ro{theme_num_id}_sala1_enter",
+                        "choices": {
+                            f"choice_ro{theme_num_id}_sala1_1": 1,
+                        },
+                        "choiceAdditional": {
+                            f"choice_ro{theme_num_id}_sala1_1": {
+                                "rewards": [],
+                                "costs": [],
+                            },
+                        },
+                    }
+                },
+            }
+        ]
+
+    def rlv2_moveTo(self):
+        cursor_pos = self.request_json["to"]
+        self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] = cursor_pos
+
+        node_type_int = self.get_current_node_type_int()
+        if node_type_int == self.get_node_type_int(self.theme_id, self.NodeType.SHOP):
+            self.move_to_shop()
+        elif node_type_int == self.get_node_type_int(self.theme_id, self.NodeType.DUEL):
+            self.move_to_duel()
+
+    def rlv2_selectChoice(self):
+        self.player_data["rlv2"]["current"]["player"]["pending"] = [
+            {
+                "index": "e_8",
+                "type": "BATTLE",
+                "content": {
+                    "battle": {
+                        "state": 0,
+                    },
                 },
             }
         ]
@@ -815,6 +884,10 @@ class Rlv2BasicManager:
         )
 
         cursor_pos = self.request_json["to"]
+        if cursor_pos is not None:
+            self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] = (
+                cursor_pos
+            )
 
         roguelike_topic_table = const_json_loader[ROGUELIKE_TOPIC_TABLE]
 
@@ -830,7 +903,6 @@ class Rlv2BasicManager:
         unkeep_buff = self.get_unkeep_buff()
 
         self.player_data["rlv2"]["current"]["player"]["state"] = "PENDING"
-        self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] = cursor_pos
         self.player_data["rlv2"]["current"]["player"]["pending"] = [
             {
                 "index": "e_4",
@@ -939,6 +1011,32 @@ class Rlv2BasicManager:
         pending_lst = self.player_data["rlv2"]["current"]["player"]["pending"].copy()
         pending_lst.pop(0)
         self.player_data["rlv2"]["current"]["player"]["pending"] = pending_lst
+
+    def convert_gridZone_req(self):
+        node_id = self.request_json["route"][-1]
+
+        zone_idx = self.player_data["rlv2"]["current"]["player"]["cursor"]["zone"]
+        node_obj = self.player_data["rlv2"]["current"]["map"]["zones"][str(zone_idx)][
+            "nodes"
+        ][node_id]
+
+        node_pos_x = node_obj["pos"]["x"]
+        node_pos_y = node_obj["pos"]["y"]
+
+        self.request_json["to"] = {
+            "x": node_pos_x,
+            "y": node_pos_y,
+        }
+
+    def rlv2_gridZone_moveAndBattleStart(self):
+        self.convert_gridZone_req()
+
+        self.rlv2_moveAndBattleStart()
+
+    def rlv2_gridZone_moveTo(self):
+        self.convert_gridZone_req()
+
+        self.rlv2_moveTo()
 
 
 class Rlv2Theme1BasicManager(Rlv2BasicManager):
@@ -1226,6 +1324,109 @@ class Rlv2Theme5BasicManager(Rlv2BasicManager):
         return stage_buff_lst
 
 
+class Rlv2Theme6BasicManager(Rlv2BasicManager):
+    def rlv2_finishEvent(self):
+        super().rlv2_finishEvent()
+
+        self.player_data["rlv2"]["current"]["module"]["scrap"] = {
+            "activeVehicle": {"isWalk": false, "instId": "s_1"},
+            "inventory": {
+                "s_1": {
+                    "instId": "s_1",
+                    "id": "rogue_6_scrap_M_11",
+                    "value": 1,
+                    "useCnt": 3,
+                    "ts": 1700000000,
+                },
+            },
+            "limit": 10,
+        }
+
+        grid_zone_obj = {"zones": {}, "stepRemain": 999, "needConfirmStepZero": false}
+        map_obj = self.player_data["rlv2"]["current"]["map"]["zones"]
+
+        for zone_index_str, zone_obj in map_obj:
+            zone_id = zone_obj["id"]
+
+            grid_zone_obj["zones"][zone_id] = {
+                "nodes": {},
+            }
+
+            for node_id, node_obj in zone_obj["nodes"]:
+                grid_zone_obj["zones"][zone_id]["nodes"][node_id] = {
+                    "content": {},
+                    "state": 0,
+                    "show": true,
+                }
+
+        self.player_data["rlv2"]["current"]["module"]["gridZone"] = grid_zone_obj
+
+        self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] = {
+            "x": 0,
+            "y": 0,
+        }
+
+    def leave_node(self):
+        super().leave_node()
+
+        if self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] is None:
+            self.player_data["rlv2"]["current"]["player"]["cursor"]["position"] = {
+                "x": 0,
+                "y": 0,
+            }
+
+    def get_stage_buff_lst(self, floor_difficulty):
+        stage_id = self.request_json["stageId"]
+
+        stage_floor = self.get_stage_floor(stage_id)
+
+        stage_buff_lst = []
+
+        floor_difficulty_rate = 1 + 0.01 * floor_difficulty
+
+        stage_buff_lst += [
+            {
+                "key": "zone_into_buff",
+                "blackboard": [
+                    {"key": "buff", "valueStr": "global_buff_normal"},
+                    {"key": "key", "valueStr": "enemy_atk_down"},
+                    {"key": "atk", "value": floor_difficulty_rate},
+                    {"key": "selector.profession", "valueStr": "none"},
+                ],
+            },
+            {
+                "key": "zone_into_buff",
+                "blackboard": [
+                    {"key": "buff", "valueStr": "global_buff_normal"},
+                    {"key": "key", "valueStr": "enemy_max_hp_down"},
+                    {"key": "max_hp", "value": floor_difficulty_rate},
+                    {"key": "selector.profession", "valueStr": "none"},
+                ],
+            },
+        ]
+
+        for i in range(stage_floor):
+            stage_buff_lst += [
+                {
+                    "key": "global_buff_normal",
+                    "blackboard": [
+                        {"key": "key", "valueStr": "enemy_atk_down"},
+                        {"key": "atk", "value": floor_difficulty_rate},
+                        {"key": "selector.profession", "valueStr": "none"},
+                    ],
+                },
+                {
+                    "key": "global_buff_normal",
+                    "blackboard": [
+                        {"key": "key", "valueStr": "enemy_max_hp_down"},
+                        {"key": "max_hp", "value": floor_difficulty_rate},
+                        {"key": "selector.profession", "valueStr": "none"},
+                    ],
+                },
+            ]
+        return stage_buff_lst
+
+
 def get_rlv2_manager(player_data, request_json, response):
     theme_id = player_data["rlv2"]["current"]["game"]["theme"]
     if theme_id == "rogue_1":
@@ -1236,6 +1437,8 @@ def get_rlv2_manager(player_data, request_json, response):
         return Rlv2Theme4BasicManager(player_data, theme_id, request_json, response)
     if theme_id == "rogue_5":
         return Rlv2Theme5BasicManager(player_data, theme_id, request_json, response)
+    if theme_id == "rogue_6":
+        return Rlv2Theme6BasicManager(player_data, theme_id, request_json, response)
     return Rlv2BasicManager(player_data, theme_id, request_json, response)
 
 
@@ -1404,6 +1607,19 @@ async def rlv2_closeRecruitTicket(player_data, request: Request):
     return response
 
 
+@router.post("/rlv2/selectChoice")
+@player_data_decorator
+async def rlv2_selectChoice(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    rlv2_manager = get_rlv2_manager(player_data, request_json, response)
+
+    rlv2_manager.rlv2_selectChoice()
+
+    return response
+
+
 @router.post("/rlv2/setPinned")
 @player_data_decorator
 async def rlv2_setPinned(player_data, request: Request):
@@ -1414,4 +1630,30 @@ async def rlv2_setPinned(player_data, request: Request):
     player_data["rlv2"]["pinned"] = theme_id
 
     response = {}
+    return response
+
+
+@router.post("/rlv2/gridZone/moveAndBattleStart")
+@player_data_decorator
+async def rlv2_gridZone_moveAndBattleStart(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    rlv2_manager = get_rlv2_manager(player_data, request_json, response)
+
+    rlv2_manager.rlv2_gridZone_moveAndBattleStart()
+
+    return response
+
+
+@router.post("/rlv2/gridZone/moveTo")
+@player_data_decorator
+async def rlv2_gridZone_moveTo(player_data, request: Request):
+    request_json = await request.json()
+    response = {}
+
+    rlv2_manager = get_rlv2_manager(player_data, request_json, response)
+
+    rlv2_manager.rlv2_gridZone_moveTo()
+
     return response
